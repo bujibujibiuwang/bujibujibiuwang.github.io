@@ -1,0 +1,150 @@
+ ---
+
+ title: python对象引用机制
+ date: 2024-11-14 20:00:00 +0800
+ categories: [Python, FluentPython]
+ tags: [blog]
+
+ ---
+
+## Chapter 8 Object References, Mutability,and Recycling
+
+### (1) Variables Are Not Boxes
+
+下面代码中，变量a和b指向的是同一个列表，而不是列表的复制。修改a实际上是在修改存放在某个地址的列表，而b也指向这个地址，因此b也会发现变化
+
+```python
+>>> a = [1, 2, 3]
+>>> b = a
+>>> a.append(4)
+>>> b
+[1, 2, 3, 4]
+```
+
+![image-20240926212352569](/Users/bujibujibiu/Library/Application Support/typora-user-images/image-20240926212352569.png)
+
+在python中，变量不是一个单独的盒子，而是便利贴，是reference variable。对于一个赋值assignment语句，首先读取右边的内容，创建相应的对象object，然后左边的变量variable绑定到这个对象object，就像贴了一张标签
+
+### (2) Identity, Equality, and Aliases
+
+lewis可以看成是charles的别名，从id和is两个函数可以看出，两者绑定的是一个对象。id会返回一个object的内存地址
+
+```python
+>>> charles = {'name': 'Charles L. Dodgson', 'born': 1832}
+>>> lewis = charles
+>>> lewis is charles
+True
+>>> id(charles), id(lewis)
+(140215650472960, 140215650472960)
+>>> lewis['balance'] = 950
+>>> charles
+{'name': 'Charles L. Dodgson', 'born': 1832, 'balance': 950}
+```
+
+如果新建alex，即便内容和charles相同，两者也不是同一个object。alex指向的是charles绑定的object的副本，通过==可以判断两者内容相同，通过字典里的__eq__判断的，但是两者是不同的object，通过is判断
+
+```python
+>>> alex = {'name': 'Charles L. Dodgson', 'born': 1832}
+>>> alex == charles
+False
+>>> alex is not charles
+True
+```
+
+#### Choosing Between == and is
+
+```
+==: 比较object的值
+is：比较object的身份identity
+```
+
+大部分情况下，我们更关心object的值，而不是身份，因此python代码里==比is用的更频繁，is比较常用的场景是检查变量是否绑定到None
+
+```python
+x is None
+```
+
+is操作符比==更快，==要加载object的属性值进行比较，对于大规模的结构比较可能会增加很多处理过程
+
+#### The Relative Immutability of Tuples
+
+元组的不可变性是相对的，元组一旦创建，结构（元素数量和顺序）就不能改变，但是如果元组包含可变对象（如列表或字典），这些可变对象的内容可以被修改，从而导致元组引用的内容发生变化，但元组本身并未改变
+
+```python
+>>> t1 = (1, 2, [30, 40])
+>>> t2 = (1, 2, [30, 40])
+>>> t1 == t2
+True
+>>> id(t1[-1])
+140215650336448
+>>> t1[-1].append(99)
+>>> id(t1[-1])
+140215650336448
+>>> t1 == t2
+False
+>>> t1[-1] = 0
+Traceback (most recent call last):
+  File "<pyshell#27>", line 1, in <module>
+    t1[-1] = 0
+TypeError: 'tuple' object does not support item assignment
+```
+
+t1和t2是值相同的两个object，t1的第三个元素指向的是可变列表，因此这个列表内容可以变化，变化后t1还是原来的那个object，id没有变化，但是和t2值不同。元组的相对不可变性是指元组绑定的对象不可变，但是如果这个对象本身是可变的，那这个对象的值也可以改变，就会体现在元组的值也改变，而元组本身未改变
+
+### (3) Copies Are Shallow by Default
+
+python中的copy分成两种，一种是浅拷贝shadllow copy，一种是深拷贝deep copy
+
+- 浅拷贝：最外层的容器被复制，但是这个新容器中的元素仍然是对原始容器中元素的引用，因此对浅拷贝中的元素进行修改也会影响到原始容器中的相应元素
+
+- 深拷贝：创建一个新容器的同时，也递归地复制原始容器中的所有元素，新容器及其内部的所有对象都是独立的副本
+
+（1）外层和内层容器的区别
+
+```python
+>>> l1 = [3, [66, 55, 44], (7, 8, 9)]
+>>> l2 = list(l1)
+>>> l1.append(100)
+>>> l1[1].remove(55)
+>>> l1
+[3, [66, 44], (7, 8, 9), 100]
+>>> l2
+[3, [66, 44], (7, 8, 9)]
+```
+
+如代码所示，l2是l1的浅拷贝，最外层的容器是[3，列表，元组]，被复制创建，因此l1.append(100)时只会在l1中改变，这是添加到最外层容器里。而内层的[66, 55, 44]和(7, 8, 9)没有被复制，l1和l2引用的是相同的对象，由于列表是可变的，因此l1[1].remove(55)时l1和l2都会改变
+
+![](/Users/bujibujibiu/Library/Application%20Support/marktext/images/2024-09-29-22-49-49-image.png)
+
+（2）内容容器可变和不可变的区别
+
+```python
+>>> l1[1] += [33, 22]
+>>> l2[2] += (10, 11)
+>>> l1
+[3, [66, 44, 33, 22], (7, 8, 9), 100]
+>>> l2
+[3, [66, 44, 33, 22], (7, 8, 9, 10, 11)]
+```
+
+列表是可变的，因此l1[1] += [33, 22]后l1和l2都会变化，但是元组不可变，l2[2] += (10, 11)相当于创建了一个新元组(7, 8, 9, 10, 11)，此时l1和l2第三个元素引用的就不是同一个对象，因此l1不会变化
+
+![](/Users/bujibujibiu/Library/Application%20Support/marktext/images/2024-09-29-22-50-02-image.png)
+
+#### Deep and Shallow Copies of Arbitrary Objects
+
+python中的copy模块提供了深拷贝deepcopy和浅拷贝copy的实现
+
+```python
+>>> import copy
+>>> name = [['Alice', 'Bill'], 'Claire', 'David']
+>>> name1 = copy.copy(name)
+>>> name2 = copy.deepcopy(name)
+>>> name[0].append('Mike')
+>>> name1
+[['Alice', 'Bill', 'Mike'], 'Claire', 'David']
+>>> name2
+[['Alice', 'Bill'], 'Claire', 'David']
+```
+
+### (4) Function Parameters as References
