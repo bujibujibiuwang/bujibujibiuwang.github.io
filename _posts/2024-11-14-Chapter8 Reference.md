@@ -1,11 +1,9 @@
- ---
-
- title: Python对象引用机制
- date: 2024-11-14 20:00:00 +0800
- categories: [Python, FluentPython]
- tags: [blog]
-
- ---
+---
+title: Python对象引用机制
+date: 2024-11-14 20:00:00 +0800
+categories: [Python, FluentPython]
+tags: [blog]
+---
 
 ## Chapter 8 Object References, Mutability,and Recycling
 
@@ -124,8 +122,6 @@ python中的copy分成两种，一种是浅拷贝shadllow copy，一种是深拷
 ```
 
 列表是可变的，因此l1[1] += [33, 22]后l1和l2都会变化，但是元组不可变，l2[2] += (10, 11)相当于创建了一个新元组(7, 8, 9, 10, 11)，此时l1和l2第三个元素引用的就不是同一个对象，因此l1不会变化
-
-
 
 #### Deep and Shallow Copies of Arbitrary Objects
 
