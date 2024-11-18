@@ -19,6 +19,8 @@ tags: [blog]
 [1, 2, 3, 4]
 ```
 
+![Variables Are Not Boxes](/assets/img/python/fluentpython-p1.png)
+
 在python中，变量不是一个单独的盒子，而是便利贴，是reference variable。对于一个赋值assignment语句，首先读取右边的内容，创建相应的对象object，然后左边的变量variable绑定到这个对象object，就像贴了一张标签
 
 ### (2) Identity, Equality, and Aliases
@@ -110,6 +112,8 @@ python中的copy分成两种，一种是浅拷贝shadllow copy，一种是深拷
 
 如代码所示，l2是l1的浅拷贝，最外层的容器是[3，列表，元组]，被复制创建，因此l1.append(100)时只会在l1中改变，这是添加到最外层容器里。而内层的[66, 55, 44]和(7, 8, 9)没有被复制，l1和l2引用的是相同的对象，由于列表是可变的，因此l1[1].remove(55)时l1和l2都会改变
 
+![外层和内层容器的区别](/assets/img/python/fluentpython-p2.png)
+
 （2）内容容器可变和不可变的区别
 
 ```python
@@ -122,6 +126,8 @@ python中的copy分成两种，一种是浅拷贝shadllow copy，一种是深拷
 ```
 
 列表是可变的，因此l1[1] += [33, 22]后l1和l2都会变化，但是元组不可变，l2[2] += (10, 11)相当于创建了一个新元组(7, 8, 9, 10, 11)，此时l1和l2第三个元素引用的就不是同一个对象，因此l1不会变化
+
+![内容容器可变和不可变的区别](/assets/img/python/fluentpython-p3.png)
 
 #### Deep and Shallow Copies of Arbitrary Objects
 
