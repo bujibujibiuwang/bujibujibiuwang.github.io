@@ -5,6 +5,8 @@ categories: [Python, FluentPython]
 tags: [blog]
 ---
 
+> 参考：《FluentPython》
+
 ## Chapter 8 Object References, Mutability,and Recycling
 
 ### (1) Variables Are Not Boxes
@@ -146,3 +148,252 @@ python中的copy模块提供了深拷贝deepcopy和浅拷贝copy的实现
 ```
 
 ### (4) Function Parameters as References
+
+python中的参数传递称为call by sharing（共享传参），参数传递机制有以下方式
+
+- **Call by Value**：函数接收实参的副本，修改副本不会影响原实参
+
+```python
+def modify(x):
+    x = 10
+
+a = 5
+modify(a)
+a
+Out[5]: 5  # 输出 5，a 并没有被修改
+```
+
+- **Call by Reference**：函数接收实参的引用，修改引用会影响原实参
+
+```python
+def modify(lst):
+    lst.append(10)
+
+a = [1, 2, 3]
+modify(a)
+a
+Out[9]: [1, 2, 3, 10]  # 输出 [1, 2, 3, 10],a被修改
+```
+
+- **Call by Sharing**：类似 `call by reference`，但修改的是对象的内容，不会改变引用本身的指向
+
+```python
+def modify(lst):
+    lst.append(10)   # 修改原对象
+    lst = [1, 2, 3]  # 创建新对象，原引用不变
+
+a = [1, 2, 3]
+modify(a)
+a
+Out[13]: [1, 2, 3, 10]. # 输出 [1, 2, 3, 10]，修改了原对象，但引用没有变
+```
+
+对于python的call by sharing，如果传入的引用是不可变的，即便函数内部修改了原对象，在外部也保持不变
+
+```python
+def f(a, b):
+    a += b
+    return a
+t = (10, 20)
+u = (30, 40)
+f(t, u)
+Out[17]: (10, 20, 30, 40)
+t, u
+Out[18]: ((10, 20), (30, 40))
+```
+
+#### Mutable Types as Parameter Defaults: Bad Idea
+
+由于python中函数参数是共享传递，因此使用可变对象作为参数默认值可能会造成问题
+
+```python
+# 定义一个Bus类，参数passengers默认为空列表
+class Bus:
+    def __init__(self, passengers=[]):
+        self.passengers = passengers
+    def pick(self, name):
+        self.passengers.append(name)
+    def drop(self, name):
+        self.passengers.remove(name)
+
+# 定义bus，增加成员
+bus = Bus()
+bus.pick('Alice')
+bus.passengers
+Out[23]: ['Alice']
+
+# 定义一个新的bus，passengers不为空，与默认设置不符
+bus2 = Bus()
+bus2.passengers
+Out[25]: ['Alice']
+```
+
+此时查看Bus初始化对象的默认属性，产生了变化，不再是[]，bus和bus2都没有传入passengers，因此它们的passengers指向的是同一个对象。如果一个默认值是可变对象，只要修改了这个值，这个变化会影响函数未来的所有调用
+
+```python
+Bus.__init__.__defaults__
+Out[38]: (['Alice'],)
+```
+
+#### Defensive Programming with Mutable Parameters
+
+在编写函数时，如果参数是一个可变参数，要认真考虑是否希望该参数被改变，比如传入了一个字典，在函数内部需要修改这个字典，那么修改变化是否需要在外部可见？
+
+- 防止修改类的初始化属性，但是对传入的passengers进行修改，在外部可见
+
+```python
+def __init__(self, passengers=None):
+    if passengers is None:
+        self.passengers = []
+    else:
+        self.passengers = passengers
+```
+
+- 防止修改类的初始化属性，对传入的passengers进行修改，在外部不可见
+
+```python
+def __init__(self, passengers=None):
+    if passengers is None:
+        self.passengers = []
+    else:
+        self.passengers = list(passengers)  # 从内存上新建一个对象
+```
+
+### (5) del and Garbage Collection
+
+> 对象永远不会被显式销毁;但是，当它们变得无法访问时，可能会被垃圾回收
+
+del语句只是删除了名字，而不是对象，但是使用del语句后可能导致某个对象没有引用，或者说该对象无法访问，因此进行了垃圾回收。
+
+在CPython中，垃圾回收garbage collection的主要算法是引用计数reference counting，每个对象都在记录指向它的引用有多少，只要计数为0，该对象就会被立即销毁，CPython调用对象的_del_方法，释放分配在该对象上的内存。
+
+垃圾回收有一个问题是循环引用，即两个对象都指向对方，这样基于引用计数无法销毁这两个对象，造成内存泄露，因此也有些Python实现采用了其它垃圾回收算法。
+
+```python
+import weakref
+def bye():
+    print('garbage collection')
+s1 = {1, 2, 3}
+s2 = s1
+ender = weakref.finalize(s1, bye)
+ender.alive
+Out[53]: True
+del s1
+ender.alive
+Out[55]: True
+s2 = 'spam'
+garbage collection
+ender.alive
+Out[57]: False
+```
+
+### (6) Weak References
+
+当某个对象的引用计数为0时，垃圾回收机制会处理该对象，但是有时我们希望引用一个不会让它停留超过必要时间的对象，比如cache。
+
+对某个对象的弱引用(weak reference)不会增加它的引用计数，这种引用称为referent，因此弱引用不会阻止垃圾回收，弱引用在缓存应用程序中很有用，这样缓存对象不会因为被缓存引用而一直保持活动状态
+
+- **不会增加引用计数**：普通的引用（强引用）会增加对象的引用计数，导致对象不会被垃圾回收。而弱引用不会增加引用计数，它允许对象在没有强引用指向它时被垃圾回收。
+- **适用于缓存和代理**：弱引用常用于实现缓存和代理模式，当对象不再被使用时，可以自动清除这些对象，而不需要手动干预。
+
+Python 提供了 `weakref` 模块来创建弱引用，此外还有WeakKeyDictionary, WeakValueDictionary, WeakSet等模块，用于存储字典，集合等弱引用对象，不是所有的python对象都可以使用弱引用
+
+```python
+import weakref
+class MyClass:
+    def __init__(self, name):
+        self.name = name
+    def __repr__(self):
+        return f'MyClass {self.name}'
+
+# 创建一个 MyClass 实例   
+obj = MyClass('zoey')
+
+# 创建一个弱引用
+weak_ref = weakref.ref(obj)
+
+# 弱引用输出obj
+print(weak_ref())
+MyClass zoey
+
+# 删除强引用
+del obj
+
+# 弱引用也删除
+print(weak_ref())
+None
+```
+
+如果想要构建一个类，同时存储所有该类的实例，可以使用WeakSet来存储对实例的弱引用，避免造成循环引用
+
+### (7) Tricks Python Plays with Immutables
+
+对于list, tuple, dict, string等创建别名或者复制，相同的操作有不同的效果
+
+```python
+# tuple创建引用
+t1 = (1, 2, 3)
+t2 = tuple(t1)
+t2 is t1
+Out[82]: True
+
+# list创建复制
+l1 = [1, 2, 3]
+l2 = list(l1)
+l2 is l1
+Out[85]: False
+
+# dict创建复制
+d1 = {1: 'a', 2: 'b', 3:'c'}
+d2 = dict(d1)
+d2 is d1
+Out[90]: False
+```
+
+```python
+# 元组的[:]创建引用，类似的还有str, bytes和frozenset
+t1 = (1, 2, 3)
+t2 = t1[:]
+t2 is t1
+Out[93]: True
+
+# 列表的[:]创建复制
+l1 = [1, 2, 3]
+l2 = l1[:]
+l2 is l1
+Out[96]: False
+```
+
+对于字符串，有一个优化技术称为字符串驻留(string interning)，Cpython使用该技术处理一些小的整数（0，-1等）的内存分配，通过减少字符串对象的重复创建来提高内存使用效率和程序性能
+
+```python
+# t1和t2值相同，但是对象不同
+t1 = (1, 2, 3)
+t2 = (1, 2, 3)
+t2 is t1
+Out[107]: False
+
+# s2和s1值相同，对象也相同
+s1 = 'abc'
+s2 = 'abc'
+s2 is s1
+Out[104]: True
+```
+
+### Summary
+
+> Every Python object has an identity, a type, and a value. Only the value of an object changes over time
+
+- 简单的赋值没有创建副本
+
+- 如果左边变量时不可变对象，增强赋值(+=, *=)会创建新的对象
+
+- 为一个已经存在的变量赋新值，不会改变绑定到这个变量的对象，称为rebinding
+
+- 函数参数作为引用传入
+
+- 将可变对象作为函数参数的默认值传入是危险的
+
+- python垃圾回收机制是基于引用计数
+
+- 如果需要循环引用，可以使用弱引用
